@@ -1,0 +1,132 @@
+########################
+## PART 1(A)
+########################
+
+# Define probability density function f(x)
+f <- function(x) {
+  0.5 * exp(-abs(x))
+}
+
+# Set up number of samples and standard deviation
+N <- 10000
+s <- 1
+
+# Initialise variables
+x <- numeric(N)
+x[1] <- rnorm(1) # Generate single random number from normal distribution with mean 0 and standard deviation 1
+
+# Execute Metropolis-Hastings algorithm
+for (i in 2:N) { 
+  # Simulate random number x* from normal distribution with mean x[i-1] and standard deviation s
+  x_star <- rnorm(1, mean = x[i-1], sd = s)
+  
+  # Compute ratio r(x*, x[i-1])
+  r <- f(x_star) / f(x[i-1])
+  
+  # Generate random number u from uniform distribution
+  u <- runif(1)
+  
+  # Accept or reject x* value based on ratio and u
+  if (log(u) < log(r)) {
+    x[i] <- x_star # Accept x*, set xi = x*
+  } else {
+    x[i] <- x[i-1] # Reject x*, set xi = x[i-1]
+  }
+}
+
+# Calculate kernel density estimate
+dens <- density(x)
+
+# Determine the maximum density value
+max_density <- max(dens$y)
+
+# Determine the range of the generated samples
+x_min <- min(x)
+x_max <- max(x)
+
+# Determine the maximum value of the true density function f(x)
+max_true_density <- max(f(seq(x_min, x_max, length.out = 1000)))
+
+# Plot histogram and kernel density estimate
+hist(x, freq = FALSE, main = "Histogram and KDE of Generated Samples", xlab = "x", ylim = c(0, max_true_density), xlim = c(-4, 4), col = "lightblue", breaks = 50)
+lines(dens, col = "blue")
+
+# Overlay f(x) graph
+curve(0.5 * exp(-abs(x)), xlim = c(-4, 4), ylim = c(0, max_true_density), add = TRUE, col = "red", lwd = 2, n = 1000)
+
+# Calculate sample mean and standard deviation
+sample_mean <- mean(x)
+sample_sd <- sd(x)
+
+# Print sample mean and standard deviation
+cat("Sample Mean:", sample_mean, "\n")
+cat("Sample Standard Deviation:", sample_sd, "\n")
+
+
+########################
+## PART 1(B)
+########################
+
+# Function to generate Metropolis-Hastings samples for a given s
+metropolis_hastings <- function(N, s, J) {
+  chains <- matrix(0, nrow = N, ncol = J)
+  for (j in 1:J) {
+    x <- numeric(N)
+    x[1] <- runif(1, -10, 10)
+    for (i in 2:N) {
+      x_star <- rnorm(1, mean = x[i-1], sd = s)
+      r <- exp(0.5 * (abs(x_star) - abs(x[i-1])))
+      u <- runif(1)
+      if (log(u) < log(r)) {
+        x[i] <- x_star
+      } else {
+        x[i] <- x[i-1]
+      }
+    }
+    chains[, j] <- x
+  }
+  return(chains)
+}
+
+# Function to compute R-hat value for a given s
+compute_rhat <- function(N, s, J) {
+  chains <- metropolis_hastings(N, s, J)
+  
+  M_j <- colMeans(chains)  # Compute sample mean for each chain
+  V_j <- apply(chains, 2, function(x) mean((x - mean(x))^2))  # Compute within-sample variance for each chain
+  
+  W <- mean(V_j)  # Overall within-sample variance
+  M <- mean(M_j)  # Overall sample mean
+  
+  B <- N * mean((M_j - M)^2)  # Between-sample variance
+  
+  R_hat <- sqrt((B + W) / W)
+  
+  return(R_hat)
+}
+
+# Calculate R-hat for N = 2000, s = 0.001 and J = 4
+# Set parameters
+N <- 2000
+s <- 0.001
+J <- 4
+
+# Calculate R-hat value
+R_hat <- compute_rhat(N, s, J)
+cat("R-hat value:", R_hat, "\n")
+
+# R-hat value calculated: 6520.643 
+
+# Set new parameters for graph
+N <- 2000
+J <- 4
+s_values <- seq(0.001, 1, by = 0.01)
+
+# Calculate R-hat values for each s
+R_hat_values <- sapply(s_values, function(s) compute_rhat(N, s, J))
+
+# Plot R-hat values over s values
+plot(s_values, R_hat_values, type = "l", xlab = "s", ylab = "R-hat",
+     main = "R-hat values over s values", col = "blue", ylim = c(0, max(R_hat_values)))
+
+## Based on the plot results, R-hat values decrease and eventually stabilise as s increases, indicating convergence.
